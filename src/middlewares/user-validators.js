@@ -7,13 +7,14 @@ import { validateJWT } from "./validate-jwt.js"
 
 
 export const registerValidator = [
-    body("fullName").notEmpty().withMessage("El nombre es requerido"),
+    body("fullName").isString().trim().isLength({min:1,max:35}).withMessage("Nombre de 1 a 35 caracteres requerido"),
     body("username").notEmpty().withMessage("El username es requerido"),
     body("email").notEmpty().withMessage("El email es requerido"),
     body("email").isEmail().withMessage("No es un email válido"),
     body("email").custom(emailExists),
     body("username").custom(usernameExists),
-    body("password").isStrongPassword({
+    body('phone').matches(/^\d{8}$/),
+    body("password").isString().isLength({max:128}).isStrongPassword({
         minLength: 8,
         minLowercase:1,
         minUppercase: 1,
@@ -27,13 +28,17 @@ export const registerValidator = [
 export const loginValidator = [
     body("email").optional().isEmail().withMessage("No es un email válido"),
     body("username").optional().isString().withMessage("Username es en formáto erróneo"),
-    body("password").isLength({min: 4}).withMessage("El password debe contener al menos 8 caracteres"),
+    body("password").isString().isLength({min:8,max:128}).withMessage("El password debe contener de 8 a 128 caracteres"),
     validarCampos,
     handleErrors
 ]
 
 export const updateUserValidator = [
     validateJWT,
+    body('fullName').optional().isString().trim().isLength({min:1,max:35}),
+    body('username').optional().isString().trim().isLength({min:3,max:40}),
+    body('email').optional().isEmail(),
+    body('phone').optional().matches(/^\d{8}$/),
     param("uid", "No es un ID válido").isMongoId(),
     param("uid").custom(userExists),
     validarCampos,
@@ -45,7 +50,8 @@ export const updatePasswordValidator = [
     validateJWT,
     param("uid").isMongoId().withMessage("No es un ID válido de MongoDB"),
     param("uid").custom(userExists),
-    body("newPassword").isLength({ min: 8 }).withMessage("El password debe contener al menos 8 caracteres"),
+    body('oldPassword').isString().isLength({min:8,max:128}),
+    body("newPassword").isString().isLength({max:128}).isStrongPassword().withMessage("La nueva contraseña debe ser fuerte"),
     validarCampos,
     handleErrors
 ];

@@ -6,16 +6,16 @@ import { validateJWT } from "./validate-jwt.js";
 
 export const createCommentValidator = [
     validateJWT,
-    body("text").notEmpty().withMessage("El texto es requerido"),
-    body("post").notEmpty().withMessage("La publicación es requerida"),
+    body("text").isString().trim().isLength({min:1,max:255}).withMessage("Texto de 1 a 255 caracteres requerido"),
+    body("post").isMongoId().withMessage("Publicación válida requerida"),
     validarCampos,
     handleErrors
 ];
 
 export const updateCommentValidator = [
     validateJWT,
+    body('text').isString().trim().isLength({min:1,max:255}),
     param("idComment", "No es un ID válido").isMongoId(),
-    param("idComment").custom(commentExists),
     validarCampos,
     handleErrors
 ];
@@ -23,7 +23,6 @@ export const updateCommentValidator = [
 export const deleteCommentValidator = [
     validateJWT,
     param("idComment", "No es un ID válido").isMongoId(),
-    param("idComment").custom(commentExists),
     validarCampos,
     handleErrors
 ];

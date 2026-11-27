@@ -1,45 +1,16 @@
-import jwt from "jsonwebtoken"
-import User from "../user/user.model.js"
-
+import jwt from 'jsonwebtoken'
+import mongoose from 'mongoose'
+import User from '../user/user.model.js'
 export const validateJWT = async (req, res, next) => {
-    try{
-        let token = req.body.token || req.query.token || req.headers["authorization"]
-
-        if(!token){
-            return res.status(400).json({
-                success: false,
-                message: "No existe token en la petición"
-            })
-        }
-
-        token = token.replace(/^Bearer\s+/, "")
-
-        const { uid } = jwt.verify(token, process.env.SECRETORPRIVATEKEY)
-
-        const user = await User.findById(uid)
-
-        if(!user){
-           return res.status(400).json({
-                success: false,
-                message: "usaurio no existe en la DB"
-           }) 
-        }
-
-        if(user.status === false){
-            return res.status(400).json({
-                success: false,
-                message: " Usuario desactivado previamente"
-            })
-        }
-
+    const authorization = req.get('Authorization')
+    const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : req.get('x-token')
+    if (!token) return res.status(401).json({ success: false, message: 'Token requerido' })
+    try {
+        const payload = jwt.verify(token, process.env.SECRETORPRIVATEKEY, { algorithms: ['HS256'] })
+        if (typeof payload === 'string' || !mongoose.isValidObjectId(payload.uid)) throw new Error('Invalid token subject')
+        const user = await User.findOne({ _id: payload.uid, status: true })
+        if (!user || (payload.version ?? 0) !== (user.tokenVersion ?? 0)) return res.status(401).json({ success: false, message: 'Sesión inválida' })
         req.usuario = user
-        
         next()
-    }catch(err){
-        return res.status(500).json({
-            success: false,
-            message : "Error al validar el token",
-            error: err.message
-        })
-    }
+    } catch { return res.status(401).json({ success: false, message: 'Token inválido o vencido' }) }
 }

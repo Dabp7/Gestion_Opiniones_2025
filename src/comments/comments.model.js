@@ -8,18 +8,19 @@ const commentsSchema = Schema({
     },
     author: {
         type: Schema.Types.ObjectId,
-        ref: 'user',
-        required: true
+        ref: 'User',
+        required: true,
+        index: true
     },
     post: {
         type: Schema.Types.ObjectId,
-        ref: 'post',
+        ref: 'Post',
         required: true
     }
 },
 {
     versionKey: false,
-    timeStamps: true
+    timestamps: true
 })
 
 

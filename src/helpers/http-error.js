@@ -1,0 +1,3 @@
+export class HttpError extends Error { constructor(status, message) { super(message); this.status = status } }
+export function fieldsOnly(body, allowed) { if (Object.keys(body).some(key => !allowed.includes(key))) throw new HttpError(400, `Solo se permiten: ${allowed.join(', ')}`); return body }
+export function pagination(query) { const limit = Number(query.limite ?? query.limit ?? 20), offset = Number(query.desde ?? query.offset ?? 0); if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 || !Number.isSafeInteger(offset) || offset < 0) throw new HttpError(400, 'Paginación inválida'); return { limit, offset } }

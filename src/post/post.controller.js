@@ -1,354 +1,55 @@
-'use strict';
+import mongoose from 'mongoose'
+import Post from './post.model.js'
+import Comments from '../comments/comments.model.js'
+import Category from '../category/category.model.js'
+import { fieldsOnly, HttpError, pagination } from '../helpers/http-error.js'
 
-import Post from './post.model.js';
-
-/**
- * @swagger
- * /posts:
- *   post:
- *     summary: Crear una nueva publicación
- *     tags: [Posts]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *                 description: Título de la publicación
- *               content:
- *                 type: string
- *                 description: Contenido de la publicación
- *             required:
- *               - title
- *               - content
- *     responses:
- *       200:
- *         description: Publicación creada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 post:
- *                   type: object
- *                   properties:
- *                     _id:
- *                       type: string
- *                       example: 60d0fe4f5311236168a109ca
- *                     title:
- *                       type: string
- *                       example: Mi primera publicación
- *                     content:
- *                       type: string
- *                       example: Este es el contenido de mi primera publicación
- *                     author:
- *                       type: string
- *                       example: 60d0fe4f5311236168a109cb
- *                     comments:
- *                       type: array
- *                       items:
- *                         type: string
- *                         example: 60d0fe4f5311236168a109cc
- *       404:
- *         description: Usuario no encontrado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Usuario no encontrado
- *       500:
- *         description: Error al crear la publicación
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Error al crear la publicación
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const addPost = async (req, res) => {
+export const addPost = async (req, res, next) => {
     try {
-        const data = req.body;
-        const user = req.usuario
-
-        if (!user) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Usuario no encontrado' 
-            });
-        }
-
-        const post = new Post({
-            ...data,
-            author: user._id,
-            comments: []
-        });
-
-        await post.save();
-
-        res.status(200).json({
-            success: true,
-            post
-        });
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: 'Error al crear la publicación',
-            error: err.message
-        });
-    }
+        fieldsOnly(req.body, ['title', 'text', 'category'])
+        const post = await mongoose.connection.transaction(async session => {
+            const category = await Category.findOneAndUpdate({ _id: req.body.category }, { $inc: { postVersion: 1 } }, { session, new: true })
+            if (!category) throw new HttpError(404, 'Categoría no encontrada')
+            return (await Post.create([{ title: req.body.title, text: req.body.text, category: category._id, author: req.usuario._id, comments: [] }], { session }))[0]
+        })
+        res.status(201).json({ success: true, post })
+    } catch (error) { next(error) }
 }
-
-/**
- * @swagger
- * /posts/{idPost}:
- *   put:
- *     summary: Actualizar una publicación existente
- *     tags: [Posts]
- *     parameters:
- *       - in: path
- *         name: idPost
- *         schema:
- *           type: string
- *         required: true
- *         description: ID de la publicación a actualizar
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *                 description: Título de la publicación
- *               content:
- *                 type: string
- *                 description: Contenido de la publicación
- *     responses:
- *       200:
- *         description: Publicación actualizada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 msg:
- *                   type: string
- *                   example: Publicación actualizada
- *                 post:
- *                   type: object
- *                   properties:
- *                     title:
- *                       type: string
- *                       example: Mi primera publicación actualizada
- *                     content:
- *                       type: string
- *                       example: Este es el contenido de mi primera publicación actualizada
- *       403:
- *         description: No tienes permiso para editar esta publicación
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: No tienes permiso para editar esta publicación
- *       404:
- *         description: Publicación no encontrada
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: Publicación no encontrada
- *       500:
- *         description: Error al actualizar la publicación
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: Error al actualizar la publicación
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const updatePost = async (req, res) => {
-    try{
-        const { idPost } = req.params;
-        const data = req.body;
-        const userToken = req.usuario._id;
-        const findPost = await Post.findById(idPost)
-        
-
-        if(userToken.toString() !== (findPost.author).toString()){
-            return res.status(403).json({
-                success: false,
-                msg: 'No tienes permiso para editar esta publicación'
-            });
-        }
-
-        const post = await Post.findByIdAndUpdate(idPost, data, { new: true });
-
-        if(!post){
-            return res.status(404).json({
-                success: false,
-                msg: 'Publicación no encontrada'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            msg: 'Publicación actualizada',
-            post
-        });
-
-
-    } catch(err){
-        res.status(500).json({
-            success: false,
-            msg: 'Error al actualizar la publicación',
-            error: err.message
-        });
-    }
-};
-
-/**
- * @swagger
- * /posts/{idPost}:
- *   delete:
- *     summary: Eliminar una publicación existente
- *     tags: [Posts]
- *     parameters:
- *       - in: path
- *         name: idPost
- *         schema:
- *           type: string
- *         required: true
- *         description: ID de la publicación a eliminar
- *     responses:
- *       200:
- *         description: Publicación eliminada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Publicación eliminada exitosamente
- *       403:
- *         description: No tienes permiso para eliminar esta publicación
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: No tienes permiso para eliminar esta publicación
- *       404:
- *         description: Publicación no encontrada
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: Publicación no encontrada
- *       500:
- *         description: Error al eliminar la publicación
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Error al eliminar la publicación
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const deletePost = async(req, res) =>{
-    try{
-        const { idPost } = req.params;
-        const userToken = req.usuario._id;
-        const findPost = await Post.findById(idPost)
-        
-
-        if(userToken.toString() !== (findPost.author).toString()){
-            return res.status(403).json({
-                success: false,
-                msg: 'No tienes permiso para eliminar esta publicación'
-            });
-        }
-
-        await Post.findByIdAndDelete(idPost);
-
-        res.status(200).json({ 
-            success: true,
-            message: 'Publicación eliminada exitosamente' 
-        });
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: 'Error al eliminar la publicación',
-            error: err.message
-        });
-    }
+export const updatePost = async (req, res, next) => {
+    try {
+        fieldsOnly(req.body, ['title', 'text', 'category'])
+        const post = await mongoose.connection.transaction(async session => {
+            if (req.body.category && !await Category.findOneAndUpdate({ _id: req.body.category }, { $inc: { postVersion: 1 } }, { session })) throw new HttpError(404, 'Categoría no encontrada')
+            const updated = await Post.findOneAndUpdate({ _id: req.params.idPost, author: req.usuario._id, status: true }, req.body, { session, new: true, runValidators: true })
+            if (!updated) throw new HttpError(404, 'Publicación propia no encontrada')
+            return updated
+        })
+        res.json({ success: true, msg: 'Publicación actualizada', post })
+    } catch (error) { next(error) }
 }
-
-
+export const deletePost = async (req, res, next) => {
+    try {
+        await mongoose.connection.transaction(async session => {
+            const post = await Post.findOneAndDelete({ _id: req.params.idPost, author: req.usuario._id }).session(session)
+            if (!post) throw new HttpError(404, 'Publicación propia no encontrada')
+            await Comments.deleteMany({ post: post._id }, { session })
+        })
+        res.json({ success: true, message: 'Publicación y comentarios eliminados' })
+    } catch (error) { next(error) }
+}
+export const getPosts = async (req, res, next) => {
+    try {
+        const { limit, offset } = pagination(req.query)
+        const filter = { status: true }
+        if (req.query.category) { if (!mongoose.isValidObjectId(req.query.category)) throw new HttpError(400, 'Categoría inválida'); filter.category = req.query.category }
+        const [posts, total] = await Promise.all([Post.find(filter).select('-comments -commentVersion').sort({ _id: -1 }).skip(offset).limit(limit).populate('author', 'fullName username').populate('category', 'name'), Post.countDocuments(filter)])
+        res.json({ success: true, total, posts, limit, offset })
+    } catch (error) { next(error) }
+}
+export const getPost = async (req, res, next) => {
+    try {
+        const post = await Post.findOne({ _id: req.params.idPost, status: true }).select('-commentVersion -comments').populate('author', 'fullName username').populate('category', 'name')
+        if (!post) throw new HttpError(404, 'Publicación no encontrada')
+        res.json({ success: true, post })
+    } catch (error) { next(error) }
+}
