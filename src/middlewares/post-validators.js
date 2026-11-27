@@ -8,18 +8,20 @@ import { hasRoles } from "./validate-roles.js";
 
 export const createPostValidator = [
     validateJWT,
-    body("title").notEmpty().withMessage("El titulo es requerido"),
-    body("text").notEmpty().withMessage("El texto es requerido"),
+    body("title").isString().trim().isLength({min:1,max:60}).withMessage("Título de 1 a 60 caracteres requerido"),
+    body("text").isString().trim().isLength({min:1,max:255}).withMessage("Texto de 1 a 255 caracteres requerido"),
     body("text").isLength({min: 1}).withMessage("El texto debe contener al menos 1 caracter"),
-    body("category").notEmpty().withMessage("La categoria es requerida"),
+    body("category").isMongoId().withMessage("Categoría válida requerida"),
     validarCampos,
     handleErrors
 ];
 
 export const updatePostValidator = [
     validateJWT,
+    body('title').optional().isString().trim().isLength({min:1,max:60}),
+    body('text').optional().isString().trim().isLength({min:1,max:255}),
+    body('category').optional().isMongoId(),
     param("idPost", "No es un ID válido").isMongoId(),
-    param("idPost").custom(postExists),
     validarCampos,
     handleErrors
 ];
@@ -27,7 +29,6 @@ export const updatePostValidator = [
 export const deletePostValidator = [
     validateJWT,
     param("idPost", "No es un ID válido").isMongoId(),
-    param("idPost").custom(postExists),
     validarCampos,
     handleErrors
 ];

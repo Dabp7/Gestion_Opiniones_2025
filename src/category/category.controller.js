@@ -1,217 +1,36 @@
-import Category from "./category.model.js";
-
-/**
- * @swagger
- * /category/default:
- *   get:
- *     summary: Crear categoría predeterminada
- *     tags: [Category]
- *     responses:
- *       200:
- *         description: Categoría predeterminada creada o ya existente
- *       500:
- *         description: Error al crear la categoría predeterminada
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Error al crear la categoria General
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const defaulCategoryCreated = async () =>{
-    try {
-
-        const defaultCategory = await Category.findOne({ name: "General" });
-
-        if(!defaultCategory){
-            const newCategory = new Category({
-                name: "General",
-                description: "Categoría predeterminada para publicaciones."
-            })
-    
-            await newCategory.save();
-
-        }
-
-        
-    }catch (err){
-        return res.status(500).json({
-            message: "Error al crear la categoria General",
-            error: err.message
-        });
-    }
-};
-
-/**
- * @swagger
- * /category:
- *   post:
- *     summary: Agregar una nueva categoría
- *     tags: [Category]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 description: Nombre de la categoría
- *               description:
- *                 type: string
- *                 description: Descripción de la categoría
- *             required:
- *               - name
- *     responses:
- *       200:
- *         description: Categoría creada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 category:
- *                   type: object
- *                   properties:
- *                     name:
- *                       type: string
- *                       example: Tecnología
- *                     description:
- *                       type: string
- *                       example: Categoría relacionada con tecnología
- *       500:
- *         description: Error al crear la categoría
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Error al crear la categoria
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const addCategory = async (req, res) => {
-    try {
-        const data = req.body;
-
-        const category = new Category({
-            ...data,
-        });
-
-        await category.save();
-
-        res.status(200).json({
-            success: true,
-            category
-        });
-
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: 'Error al crear la categoria',
-            error: err.message
-        });
-    }
+import mongoose from 'mongoose'
+import Category from './category.model.js'
+import Post from '../post/post.model.js'
+import { fieldsOnly, HttpError, pagination } from '../helpers/http-error.js'
+export const defaulCategoryCreated = () => Category.findOneAndUpdate({ name: 'General' }, { $setOnInsert: { name: 'General', description: 'Categoría predeterminada' } }, { upsert: true, new: true, runValidators: true })
+export const addCategory = async (req, res, next) => {
+    try { fieldsOnly(req.body, ['name', 'description']); res.status(201).json({ success: true, category: await Category.create(req.body) }) }
+    catch (error) { next(error) }
 }
-
-/**
- * @swagger
- * /category/{idCategory}:
- *   put:
- *     summary: Actualizar una categoría existente
- *     tags: [Category]
- *     parameters:
- *       - in: path
- *         name: idCategory
- *         schema:
- *           type: string
- *         required: true
- *         description: ID de la categoría a actualizar
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 description: Nombre de la categoría
- *               description:
- *                 type: string
- *                 description: Descripción de la categoría
- *     responses:
- *       200:
- *         description: Categoría actualizada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 msg:
- *                   type: string
- *                   example: Categoria actualizada
- *                 category:
- *                   type: object
- *                   properties:
- *                     name:
- *                       type: string
- *                       example: Tecnología
- *                     description:
- *                       type: string
- *                       example: Categoría relacionada con tecnología
- *       500:
- *         description: Error al actualizar la categoría
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: Error al actualizar la categoria
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const updateCategory = async (req, res) =>{
-    try{
-        const { idCategory } = req.params;
-        const data = req.body;
-
-        const updateCategory = await Category.findByIdAndUpdate(idCategory, data, { new: true });
-
-        res.status(200).json({
-            success: true,
-            msg: 'Categoria actualizada',
-            category: updateCategory,
-        });
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            msg: 'Error al actualizar la categoria',
-            error: err.message
-        });
-    }
-};
+export const updateCategory = async (req, res, next) => {
+    try {
+        fieldsOnly(req.body, ['name', 'description'])
+        const category = await Category.findById(req.params.idCategory)
+        if (!category) throw new HttpError(404, 'Categoría no encontrada')
+        if (category.name === 'General' && req.body.name && req.body.name !== 'General') throw new HttpError(409, 'General conserva su nombre')
+        Object.assign(category, req.body); await category.save()
+        res.json({ success: true, category, msg: 'Categoría actualizada' })
+    } catch (error) { next(error) }
+}
+export const deleteCategory = async (req, res, next) => {
+    try {
+        await mongoose.connection.transaction(async session => {
+            const category = await Category.findOneAndUpdate({ _id: req.params.idCategory }, { $inc: { postVersion: 1 } }, { session, new: true })
+            if (!category) throw new HttpError(404, 'Categoría no encontrada')
+            if (category.name === 'General') throw new HttpError(409, 'General no puede eliminarse')
+            const general = await Category.findOneAndUpdate({ name: 'General' }, { $setOnInsert: { name: 'General', description: 'Categoría predeterminada' } }, { session, upsert: true, new: true })
+            await Post.updateMany({ category: category._id }, { $set: { category: general._id } }, { session })
+            await Category.deleteOne({ _id: category._id }, { session })
+        })
+        res.json({ success: true, message: 'Categoría eliminada; publicaciones reasignadas a General' })
+    } catch (error) { next(error) }
+}
+export const getCategories = async (req, res, next) => {
+    try { const { limit, offset } = pagination(req.query); res.json({ success: true, categories: await Category.find().select('-postVersion').sort({ _id: 1 }).skip(offset).limit(limit), total: await Category.countDocuments({}) }) }
+    catch (error) { next(error) }
+}

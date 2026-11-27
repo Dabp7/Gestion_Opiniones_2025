@@ -1,374 +1,45 @@
-'use strict';
-
-import Post from '../post/post.model.js';
-import Comments from "./comments.model.js"
-
-/**
- * @swagger
- * /comments:
- *   post:
- *     summary: Agregar un nuevo comentario
- *     tags: [Comments]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               post:
- *                 type: string
- *                 description: ID del post al que se agrega el comentario
- *               content:
- *                 type: string
- *                 description: Contenido del comentario
- *             required:
- *               - post
- *               - content
- *     responses:
- *       200:
- *         description: Comentario agregado con éxito
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 comment:
- *                   type: object
- *                   properties:
- *                     _id:
- *                       type: string
- *                       example: 60d0fe4f5311236168a109ca
- *                     content:
- *                       type: string
- *                       example: Este es un comentario
- *                     author:
- *                       type: string
- *                       example: 60d0fe4f5311236168a109cb
- *                     post:
- *                       type: string
- *                       example: 60d0fe4f5311236168a109cc
- *                 message:
- *                   type: string
- *                   example: Comentario agregado con éxito
- *       404:
- *         description: Usuario o post no encontrado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Usuario no encontrado
- *       500:
- *         description: Error al agregar el comentario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Error al agregar el comentario
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const addComment = async(req, res) =>{
+import mongoose from 'mongoose'
+import Post from '../post/post.model.js'
+import Comments from './comments.model.js'
+import { fieldsOnly, HttpError, pagination } from '../helpers/http-error.js'
+export const addComment = async (req, res, next) => {
     try {
-        const data = req.body; 
-        const user = req.usuario;
-
-        if(!user){
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Usuario no encontrado' 
-            });
-        }
-
-        const { post } = data; 
-
- 
-        const findPost = await Post.findById(post);
-
-        if(!findPost){
-            return res.status(404).json({
-                success: false,
-                message: 'Post no encontrado'
-            });
-        }
-
-        const comment = new Comments({
-            ...data,
-            author: user._id,
-            post: findPost 
-        });
-
-            const savedComment = await comment.save();
-
-            findPost.comments.push(savedComment._id);
-
-            await findPost.save();
-
-        res.status(200).json({
-            success: true,
-            comment: savedComment,
-            message: 'Comentario agregado con éxito'
-        });
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: 'Error al agregar el comentario',
-            error: err.message
-        });
-    }
-};
-
-/**
- * @swagger
- * /comments/{idComment}:
- *   put:
- *     summary: Actualizar un comentario existente
- *     tags: [Comments]
- *     parameters:
- *       - in: path
- *         name: idComment
- *         schema:
- *           type: string
- *         required: true
- *         description: ID del comentario a actualizar
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               content:
- *                 type: string
- *                 description: Contenido del comentario
- *     responses:
- *       200:
- *         description: Comentario actualizado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 msg:
- *                   type: string
- *                   example: Comentario actualizado
- *                 comment:
- *                   type: object
- *                   properties:
- *                     content:
- *                       type: string
- *                       example: Este es un comentario actualizado
- *       403:
- *         description: No tienes permiso para editar este comentario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: No tienes permiso para editar este comentario
- *       404:
- *         description: Comentario no encontrado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: Comentario no encontrado
- *       500:
- *         description: Error al actualizar el comentario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: Error al actualizar el comentario
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const updateComment = async (req, res) => {
-    try{
-        const { idComment } = req.params;
-        const data = req.body;
-        const userToken = req.usuario._id;
-        const findComment = await Comments.findById(idComment)
-        
-
-        if(userToken.toString() !== (findComment.author).toString()){
-            return res.status(403).json({
-                success: false,
-                msg: 'No tienes permiso para editar este comentario'
-            });
-        }
-
-        const comment = await Comments.findByIdAndUpdate(idComment, data, { new: true });
-
-        if(!comment){
-            return res.status(404).json({
-                success: false,
-                msg: 'Comentario no encontrado'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            msg: 'Comentario actualizado',
-            comment
-        });
-
-
-    } catch(err){
-        res.status(500).json({
-            success: false,
-            msg: 'Error al actualizar el comentario',
-            error: err.message
-        });
-    }
-};
-
-/**
- * @swagger
- * /comments/{idComment}:
- *   delete:
- *     summary: Eliminar un comentario existente
- *     tags: [Comments]
- *     parameters:
- *       - in: path
- *         name: idComment
- *         schema:
- *           type: string
- *         required: true
- *         description: ID del comentario a eliminar
- *     responses:
- *       200:
- *         description: Comentario eliminado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Comentario eliminado exitosamente
- *       403:
- *         description: No tienes permiso para eliminar este comentario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: No tienes permiso para eliminar este comentario
- *       404:
- *         description: Comentario no encontrado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 msg:
- *                   type: string
- *                   example: Comentario no encontrado
- *       500:
- *         description: Error al eliminar el comentario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Error al eliminar el comentario
- *                 error:
- *                   type: string
- *                   example: Error message
- */
-export const deleteComment = async(req, res) =>{
-    try{
-        const { idComment } = req.params;
-        const userToken = req.usuario._id;
-        const findComment = await Comments.findById(idComment)
-        
-
-        if(userToken.toString() !== (findComment.author).toString()){
-            return res.status(403).json({
-                success: false,
-                msg: 'No tienes permiso para eliminar este comentario'
-            });
-        }
-    
-        const findPost = await Post.findById(findComment.post);
-
-        findPost.comments.pull(idComment);
-
-        await findPost.save();
-
-        await Comments.findByIdAndDelete(idComment);
-
-        res.status(200).json({ 
-            success: true,
-            message: 'Comentario eliminado exitosamente'            
-        });
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: 'Error al eliminar el comentario',
-            error: err.message
-        });
-    }
+        fieldsOnly(req.body, ['text', 'post'])
+        const comment = await mongoose.connection.transaction(async session => {
+            const post = await Post.findOneAndUpdate({ _id: req.body.post, status: true }, { $inc: { commentVersion: 1 } }, { session, new: true })
+            if (!post) throw new HttpError(404, 'Publicación no encontrada')
+            const created = (await Comments.create([{ text: req.body.text, post: post._id, author: req.usuario._id }], { session }))[0]
+            await Post.updateOne({ _id: post._id }, { $addToSet: { comments: created._id } }, { session })
+            return created
+        })
+        res.status(201).json({ success: true, comment, message: 'Comentario agregado' })
+    } catch (error) { next(error) }
 }
-
-
-
-
-
-
+export const updateComment = async (req, res, next) => {
+    try {
+        fieldsOnly(req.body, ['text'])
+        const comment = await Comments.findOneAndUpdate({ _id: req.params.idComment, author: req.usuario._id }, { text: req.body.text }, { new: true, runValidators: true })
+        if (!comment) throw new HttpError(404, 'Comentario propio no encontrado')
+        res.json({ success: true, msg: 'Comentario actualizado', comment })
+    } catch (error) { next(error) }
+}
+export const deleteComment = async (req, res, next) => {
+    try {
+        await mongoose.connection.transaction(async session => {
+            const comment = await Comments.findOne({ _id: req.params.idComment, author: req.usuario._id }).session(session)
+            if (!comment) throw new HttpError(404, 'Comentario propio no encontrado')
+            await Post.updateOne({ _id: comment.post }, { $pull: { comments: comment._id }, $inc: { commentVersion: 1 } }, { session })
+            await Comments.deleteOne({ _id: comment._id }, { session })
+        })
+        res.json({ success: true, message: 'Comentario eliminado' })
+    } catch (error) { next(error) }
+}
+export const getComments = async (req, res, next) => {
+    try {
+        const { limit, offset } = pagination(req.query)
+        if (!await Post.exists({ _id: req.params.idPost, status: true })) throw new HttpError(404, 'Publicación no encontrada')
+        const filter = { post: req.params.idPost }
+        const [comments, total] = await Promise.all([Comments.find(filter).sort({ _id: 1 }).skip(offset).limit(limit).populate('author', 'fullName username'), Comments.countDocuments(filter)])
+        res.json({ success: true, comments, total, limit, offset })
+    } catch (error) { next(error) }
+}

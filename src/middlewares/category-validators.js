@@ -8,8 +8,8 @@ import { hasRoles } from "./validate-roles.js";
 export const createCategoryValidator = [
     validateJWT,
     hasRoles("ADMIN_ROLE"),
-    body("name").notEmpty().withMessage("El nombre es requerido"),
-    body("description").notEmpty().withMessage("La descripción es requerida"),
+    body("name").isString().trim().isLength({min:1,max:60}).withMessage("Nombre de 1 a 60 caracteres requerido"),
+    body("description").isString().trim().isLength({min:1,max:100}).withMessage("Descripción de 1 a 100 caracteres requerida"),
     validarCampos,
     handleErrors
 ];
@@ -17,8 +17,9 @@ export const createCategoryValidator = [
 export const updateCategoryValidator = [
     validateJWT,
     hasRoles("ADMIN_ROLE"),
+    body('name').optional().isString().trim().isLength({min:1,max:60}),
+    body('description').optional().isString().trim().isLength({min:1,max:100}),
     param("idCategory", "No es un ID válido").isMongoId(),
-    param("idCategory").custom(categoryExists),
     validarCampos,
     handleErrors
 ];

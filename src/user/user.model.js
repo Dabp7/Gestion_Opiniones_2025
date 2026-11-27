@@ -18,7 +18,8 @@ const userSchema = Schema({
     },
     password:{
         type: String,
-        required: [true, "Password is required"]
+        required: [true, "Password is required"],
+        select: false
     },
     phone:{
         type: String,
@@ -29,20 +30,25 @@ const userSchema = Schema({
     role:{
         type: String,
         required: true,
-        enum: ["ADMIN_ROLE", "USER_ROLE"]
+        enum: ["ADMIN_ROLE", "USER_ROLE"],
+        default: 'USER_ROLE'
     },
     status:{
         type: Boolean,
         default: true
+    },
+    tokenVersion:{
+        type: Number,
+        default: 0
     }
 },
 {
     versionKey: false,
-    timeStamps: true
+    timestamps: true
 })
 
 userSchema.methods.toJSON = function(){
-    const {password, _id, ...usuario} = this.toObject()
+    const {password, tokenVersion, _id, ...usuario} = this.toObject()
     usuario.uid = _id
     return usuario
 }

@@ -13,26 +13,30 @@ const postSchema = Schema({
     },
     category: {
         type: Schema.Types.ObjectId,
-        ref: 'category',
+        ref: 'Category',
         required: true
     },
     author: {
         type: Schema.Types.ObjectId,
-        ref: 'user',
+        ref: 'User',
         required: true
     },
     comments: [{
         type: Schema.Types.ObjectId,
-        ref: 'comments'
+        ref: 'Comments'
     }],
     status:{
         type: Boolean,
         default: true
+    },
+    commentVersion:{
+        type: Number,
+        default: 0
     }
 },
 {
     versionKey: false,
-    timeStamps: true
+    timestamps: true
 })
 
 
